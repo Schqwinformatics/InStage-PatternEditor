@@ -2,6 +2,8 @@ import { PatternEditorAction } from '../shared/patternEditorAction';
 import { Context } from '../../shared/context';
 import { generateUUID } from '../shared/uuid';
 import { PatternToNetworkParser } from '../shared/GraphFormatParsers/p2visParser';
+import { OperationTypes } from './visualEditor';
+import { visualEditorNode } from './visualEditor.reducer';
 
 export enum ActionTypes {
     INITIALIZE = 'PATTERNEDITOR.INITIALIZE',
@@ -14,12 +16,14 @@ export enum ActionTypes {
     ADD_EDGE = 'PATTERNEDITOR.ADD.EDGE',
     EDIT_EDGE_LABEL = 'PATTERNEDITOR.EDIT.EDGE.LABEL',
     EDIT_EDGE_ENDPOINTS = 'PATTERNEDITOR.EDIT.EDGE.ENDPOINTS',
-    REMOVE_EDGE = 'PATTERNEDITOR.REMOVE.EDGE'
+    REMOVE_EDGE = 'PATTERNEDITOR.REMOVE.EDGE',
+
+    ADD_OPERATION_TO_SELECTION = 'PATTERNEDITOR.SELECTION.ADD.OPERATION'
 }
 
 export interface InitializeAction extends PatternEditorAction {
-    nodes: vis.Node[];
-    edges: vis.Edge[];
+    nodes: visualEditorNode[];
+    edges: visualEditorEdge[];
 }
 
 export interface AddNodeAction extends PatternEditorAction {
@@ -65,6 +69,12 @@ export interface RemoveEdgeAction extends PatternEditorAction {
     id: string;
 }
 
+export interface AddOperationToSelectionAction extends PatternEditorAction {
+    operationType: OperationTypes;
+    nodeIds: string[];
+    edgeIds: string[];
+}
+
 export function initialize(context: Context): InitializeAction {
 
     let networkData = PatternToNetworkParser.parseContext(context);
@@ -74,6 +84,15 @@ export function initialize(context: Context): InitializeAction {
             nodes: networkData.nodes,
             edges: networkData.edges
     };
+}
+
+export function addOperationToSelection(operationType: OperationTypes, nodeIds: string[], edgeIds: string[]): AddOperationToSelectionAction {
+    return {
+        type: ActionTypes.ADD_OPERATION_TO_SELECTION,
+        operationType: operationType,
+        nodeIds: nodeIds,
+        edgeIds: edgeIds
+    }
 }
 
 export function addNode(label: string, x: number, y: number, id?: string): AddNodeAction {

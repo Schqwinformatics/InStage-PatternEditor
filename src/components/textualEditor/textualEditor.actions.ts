@@ -1,6 +1,7 @@
 import { PatternEditorAction } from '../shared/patternEditorAction';
 import { CodeToPatternParser } from '../shared/GraphFormatParsers/t2pParser';
 import { PatternToNetworkParser } from '../shared/GraphFormatParsers/p2visParser';
+import { visualEditorEdge, visualEditorNode } from '../visualEditor/visualEditor.reducer';
 
 export enum ActionTypes {
     CHANGE_TEXT = 'PATTERNEDITOR.UPDATE.TEXT',
@@ -19,8 +20,8 @@ export interface UpdateTextAction extends PatternEditorAction {
 }
 
 export interface ParseAction extends PatternEditorAction {
-    nodes: vis.Node[];
-    edges: vis.Edge[];
+    nodes: visualEditorNode[];
+    edges: visualEditorEdge[];
 }
 
 export interface ParsingFailedAction extends PatternEditorAction {

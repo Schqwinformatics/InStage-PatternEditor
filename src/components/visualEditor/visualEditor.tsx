@@ -11,21 +11,27 @@ import { Context } from '../../shared/context';
 import '../../../node_modules/vis/dist/vis.css';
 import '../../../node_modules/vis/dist/vis.js';
 import { generateUUID } from '../shared/uuid';
+import { generateOptions } from './networkOptionGenerator';
 
 export interface VisualEditorProps {
     nodes?: vis.Node[];
     edges?: vis.Edge[];
     context?: Context;
+    isFocussed?: boolean;
 
     initializeFromContext?: (context: Context) => Promise<{ nodes: vis.Node[], edges: vis.Edge[] }>;
+
     addNode?: (label: string, x: number, y: number, id?: string) => Promise<void>;
     editNodeLabel?: (nodeId: string, label: string) => Promise<void>;
     changeNodePosition?: (nodeId: string, x: number, y: number) => Promise<void>;
     removeNode?: (nodeId: string) => Promise<void>;
+
     addEdge?: (id: string, from: string, to: string) => Promise<void>;
     editEdgeLabel?: (edgeId: string, label: string) => Promise<void>;
     editEdgeEndpoints?: (id: string, from: string, to: string) => Promise<void>;
     removeEdge?: (edgeId: string) => Promise<void>;
+
+    addOperationToSelection?: (operationType: OperationTypes, nodeIds: string[], edgeIds: string[]) => Promise<void>;
 }
 
 enum ClickEventTargetTypes {
@@ -33,6 +39,12 @@ enum ClickEventTargetTypes {
     NODE = 'Node',
     NONE = 'None',
     MIXED = 'Mixed'
+}
+
+export enum OperationTypes {
+    MATCH = 'Match',
+    OPTIONAL_MATCH = 'Optional_Match',
+    RETURN = 'Return',
 }
 
 interface VisualEditorState {
@@ -73,129 +85,12 @@ export class VisualEditor extends React.Component<VisualEditorProps, VisualEdito
         }
         this.graphNetwork = new vis.Network(container, data, this.networkOptions);
 
-        const options = {
-            autoResize: true,
-            height: '1000px',
-            width: '100%',
-            locale: 'de',
-            clickToUse: false,
-
-            edges: {
-                arrows: {
-                    to:     {enabled: true, scaleFactor: 1, type: 'arrow'},
-                    middle: {enabled: false, scaleFactor: 1, type: 'arrow'},
-                    from:   {enabled: false, scaleFactor: 1, type: 'arrow'}
-                  },
-                  arrowStrikethrough: true,
-                  chosen: true,
-                  color: {
-                    color: '#848484',
-                    highlight: '#848484',
-                    hover: '#848484',
-                    inherit: 'from',
-                    opacity: 1.0
-                  },
-                  dashes: true,
-                  hidden: false,
-                  hoverWidth: 1.5,
-                  label: 'HALLOOOOO :-)',
-                  labelHighlightBold: true,
-                  physics: true,
-                  scaling: {
-                    min: 1,
-                    max: 15,
-                    label: {
-                      enabled: true,
-                      min: 14,
-                      max: 30,
-                      maxVisible: 30,
-                      drawThreshold: 5
-                    },
-                    customScalingFunction: (min: number, max: number, total: number, value: number) => {
-                      if (max === min) {
-                        return 0.5;
-                      } else {
-                        var scale = 1 / (max - min);
-                        return Math.max(0, (value - min) * scale);
-                      }
-                    }
-                  },
-                  selectionWidth: 1,
-                  selfReferenceSize: 20,
-                  shadow: {
-                    enabled: false,
-                    color: 'rgba(0,0,0,0.5)',
-                    size: 10,
-                    x: 5,
-                    y: 5
-                  },
-                  smooth: {
-                    enabled: true,
-                    type: "dynamic",
-                    roundness: 0.5
-                  },
-                  title: "HALLO",
-                  width: 1,
-                  widthConstraint: false
-            },
-            nodes: {
-
-            },
-            groups: {
-
-            },
-            layout: {
-
-            },
-            interaction: {
-                hover: true,
-                multiselect: true,
-                navigationButtons: true,
-                selectConnectedEdges: true,
-            },
-            manipulation: {
-                enabled: true,
-                addEdge: ((edgeData: vis.Edge, callback: (edgeData: vis.Edge) => void) => {
-                    this.addEdge(generateUUID(), edgeData.from.toString(), edgeData.to.toString());
-                    edgeData.arrows = {
-                        to:     {enabled: true, scaleFactor: 1, type: 'arrow'},
-                        middle: {enabled: true, scaleFactor: 1, type: 'arrow'},
-                        from:   {enabled: true, scaleFactor: 1, type: 'circle'}
-                    };
-                    callback(edgeData);
-                }),
-                editEdge: ((edgeData: vis.Edge, callback: (edgeData: vis.Edge) => void) => {
-                    let from = edgeData.from;
-                    let to = edgeData.to;
-                    let id = edgeData.id;
-                    this.editEdgeEndpoints(id.toString(), from.toString(), to.toString());
-                    callback(edgeData);
-                }),
-                deleteEdge: ((deleteData: { nodes: vis.Node[],
-                                            edges: vis.Edge[]
-   }                        , callback: (deleteData: { nodes: vis.Node[],
-                                                       edges: vis.Edge[] }
-                                        ) => void) => {
-                    deleteData.edges.forEach((id) => this.removeEdge(id.toString()));
-                    callback(deleteData);
-                }),
-                addNode: ((nodeData: vis.Node, callback: (nodeData: vis.Node) => void) => {
-                    this.addNode(nodeData.label, nodeData.x, nodeData.y, nodeData.id.toString());
-                    callback(nodeData);
-                }),
-                deleteNode: ((deleteData: { nodes: vis.Node[],
-                                            edges: vis.Edge[]
-                           }, callback: (deleteData: { nodes: vis.Node[],
-                                                       edges: vis.Edge[] }
-                                        ) => void) => {
-                    deleteData.nodes.forEach((id) => this.removeNode(id.toString()));
-                    callback(deleteData);
-                }),
-            },
-            physics: {
-                enabled: false,
-            },
-        };
+        const options = generateOptions(
+            (label: string, x: number, y: number, id: string) => this.addNode(label, x, y, id), 
+            (id: string) => this.removeNode(id),
+            (edgeId: string, fromId: string, toId: string) => this.addEdge(edgeId, fromId, toId), 
+            (edgeId: string, fromId: string, toId: string) => this.editEdgeEndpoints(edgeId, fromId, toId), 
+            (edgeId: string) => this.removeEdge(edgeId));
 
         this.graphNetwork.setOptions(options);
         this.graphNetwork.on('doubleClick', (e) => {
@@ -208,9 +103,15 @@ export class VisualEditor extends React.Component<VisualEditorProps, VisualEdito
                     break;
 
                 case ClickEventTargetTypes.NODE:
-                    let nodeName = prompt("Bitte geben Sie einen Namen für den Knoten ein: ", "Arsch");
+                    let nodeName = prompt("Bitte geben Sie einen Namen für den Knoten ein: ", "NODE");
                     let nodeId = e.nodes[0];
                     this.editNodeLabel(nodeId, nodeName);
+                    break;
+
+                case ClickEventTargetTypes.MIXED:
+                    let nodeNameMixed = prompt("Bitte geben Sie einen namen für den Knoten ein: ", "MIXED");
+                    let nodeIdMixed = e.nodes[0];
+                    this.editNodeLabel(nodeIdMixed, nodeNameMixed);
                     break;
 
                 case ClickEventTargetTypes.NONE:
@@ -225,8 +126,15 @@ export class VisualEditor extends React.Component<VisualEditorProps, VisualEdito
             switch (this.checkTargetOfClickEvent(e)) {
 
                 case ClickEventTargetTypes.NODE:
-                    let nodeId = e.nodes[0];
-                    this.props.changeNodePosition(nodeId, e.pointer.canvas.x, e.pointer.canvas.y);
+                    let nodeId: vis.IdType = e.nodes[0];
+                    let position: vis.Position = this.graphNetwork.getPositions(nodeId);
+                    this.props.changeNodePosition(nodeId.toString(), position[nodeId].x, position[nodeId].y);
+                    break;
+                
+                case ClickEventTargetTypes.MIXED:
+                    let nodeIdMixed: vis.IdType = e.nodes[0];
+                    let positionMixed: vis.Position = this.graphNetwork.getPositions(nodeIdMixed);
+                    this.props.changeNodePosition(nodeIdMixed.toString(), positionMixed[nodeIdMixed].x, positionMixed[nodeIdMixed].y);
                     break;
 
                 default:
@@ -246,9 +154,18 @@ export class VisualEditor extends React.Component<VisualEditorProps, VisualEdito
             edges: edges
         };
 
+        var viewPosition = this.graphNetwork.getViewPosition();
+        var zoomLevel = this.graphNetwork.getScale();
+
         if (this.graphNetwork) {
             this.graphNetwork.setData(data);
-            // this.graphNetwork.redraw();
+            this.graphNetwork.moveTo({
+                position: {
+                    x: viewPosition.x,
+                    y: viewPosition.y,
+                },
+                scale: zoomLevel
+            });
         }
     }
 
@@ -256,11 +173,77 @@ export class VisualEditor extends React.Component<VisualEditorProps, VisualEdito
         return (
             <>
                 <Typography variant="display1">Graphischer PatternEditor</Typography>
-                <Paper style={{height: '85%'}}>
-                    <div id={"GraphVisualization"} style={{height: "100%", width: "100%"}} />
+                <Paper style={{height: '100%'}}>
+                    <div    id={"GraphVisualization"} 
+                            onKeyPress={(e: React.KeyboardEvent<HTMLDivElement>) => this.handleKeyEvent(e)} 
+                            style={{height: "100%", width: "100%"}} />
+
+                    <Button variant="fab" 
+                        color="primary" 
+                        onClick={() => this.addSelectionToOperation(OperationTypes.MATCH)}
+                        style={{position: "absolute", bottom: 180, left: 170, width: 70}}
+                    >
+                        MATCH
+                    </Button>
+                    <Button variant="fab" 
+                            color="default" 
+                            onClick={() => this.addSelectionToOperation(OperationTypes.OPTIONAL_MATCH)}
+                            style={{position: "absolute", bottom: 180, left: 250, width: 70}}
+                    >
+                        O_MATCH
+                    </Button>
+                    <Button variant="fab" 
+                            color="secondary" 
+                            onClick={() => this.addSelectionToOperation(OperationTypes.RETURN)}
+                            style={{position: "absolute", bottom: 180, left: 330, width: 70}}
+                    >
+                        RETURN
+                    </Button>
+                    <Button variant="fab" 
+                            color="default" 
+                            onClick={() => this.convertToDOTLanguage()}
+                            style={{position: "absolute", bottom: 180, left: 860, width: 70}}
+                    >
+                        DOT
+                    </Button>
+                    <Button variant="fab" 
+                            color="default" 
+                            onClick={() => this.convertToCypher()}
+                            style={{position: "absolute", bottom: 180, left: 950, width: 70}}
+                    >
+                        CYPHER
+                    </Button>
                 </Paper>
             </>
         );
+    }
+
+    private handleKeyEvent(e: React.KeyboardEvent<HTMLDivElement>): void {
+        this.graphNetwork.addEdgeMode();
+    }
+
+    private addSelectionToOperation(operationType: OperationTypes): void {
+
+        let selection = this.graphNetwork.getSelection();
+        let nodeIds = selection.nodes.map((nodeId: vis.IdType) => {
+            return nodeId.toString();
+        });
+        let edgeIds = selection.edges.map((edgeId: vis.IdType) => {
+            return edgeId.toString();
+        });
+        
+        this.props.addOperationToSelection(operationType, nodeIds, edgeIds);
+    }
+
+    private convertToDOTLanguage(): void {
+        const nodes = this.props.nodes;
+        const edges = this.props.edges;
+
+
+    }
+
+    private convertToCypher(): void {
+        alert("not implemented");
     }
 
     private editNodeLabel(nodeId: string, label: string): void {
@@ -362,6 +345,9 @@ function mapDispatchToProps(dispatch: Dispatch<PatternEditorAction>): {} | Visua
         },
         removeEdge: (edgeId: string) => {
             dispatch(actions.removeEdge(edgeId));
+        },
+        addOperationToSelection: (operationType: OperationTypes, nodeIds: string[], edgeIds: string[]) => {
+            dispatch(actions.addOperationToSelection(operationType, nodeIds, edgeIds));
         },
         initializeFromContext: (context: Context) => {
             dispatch(actions.initialize(context));
